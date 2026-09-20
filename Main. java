@@ -1,0 +1,107 @@
+import java.util.*;
+import java.io.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+class Transaction implements Serializable {
+    String fromUPI, toUPI, date;
+    double amount;
+    Transaction(String from, String to, double amt) {
+        this.fromUPI = from;
+        this.toUPI = to;
+        this.amount = amt;
+        this.date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"));
+    }
+    public String toString() {
+        return date + " | " + fromUPI + " -> " + toUPI + " : Rs." + amount;
+    }
+}
+
+class UPIUser implements Serializable {
+    String name, upiId, pin;
+    double balance;
+    ArrayList<Transaction> history = new ArrayList<>();
+    
+    UPIUser(String name, String upiId, String pin, double balance) {
+        this.name = name;
+        this.upiId = upiId;
+        this.pin = pin;
+        this.balance = balance;
+    }
+}
+
+public class Main {
+    static HashMap<String, UPIUser> users = new HashMap<>();
+    static final String FILE = "upi_data.ser";
+    static Scanner sc = new Scanner(System.in);
+    
+    public static void main(String[] args) {
+        loadData();
+        // Default demo users for testing
+        if(users.isEmpty()) {
+            users.put("tharun@okaxis", new UPIUser("Tharun", "tharun@okaxis", "1234", 5000));
+            users.put("rahul@okhdfc", new UPIUser("Rahul", "rahul@okhdfc", "1111", 3000));
+        }
+        
+        System.out.println("=== UPI PAYMENT SIMULATOR (PhonePe Clone) ===");
+        System.out.print("Enter Your UPI ID (ex: tharun@okaxis): ");
+        String myUpi = sc.nextLine();
+        UPIUser me = users.get(myUpi);
+        if(me == null) {
+            System.out.println("Creating new UPI Account...");
+            System.out.print("Your Name: "); String name = sc.nextLine();
+            System.out.print("Set 4-digit UPI PIN: "); String pin = sc.nextLine();
+            me = new UPIUser(name, myUpi, pin, 10000);
+            users.put(myUpi, me);
+            System.out.println("Account Created! Bonus Rs.10000 added");
+        }
+        
+        System.out.print("Enter UPI PIN: ");
+        if(!sc.nextLine().equals(me.pin)) {
+            System.out.println("Wrong PIN! Exit"); return;
+        }
+        
+        while(true) {
+            System.out.println("\n--- Welcome " + me.name + " [" + me.upiId + "] ---");
+            System.out.println("1.Check Balance 2.Send Money 3.Transaction History 4.All Users 5.Exit");
+            System.out.print("Choose: ");
+            String ch = sc.nextLine();
+            
+            if(ch.equals("1")) {
+                System.out.println("Balance: Rs." + me.balance);
+            } else if(ch.equals("2")) {
+                System.out.print("Receiver UPI ID: "); String to = sc.nextLine();
+                UPIUser receiver = users.get(to);
+                if(receiver == null) { System.out.println("UPI ID not found!"); continue; }
+                System.out.print("Amount: "); double amt = Double.parseDouble(sc.nextLine());
+                if(amt > me.balance) { System.out.println("Insufficient Balance!"); continue; }
+                System.out.print("Confirm PIN: "); if(!sc.nextLine().equals(me.pin)) { System.out.println("Wrong PIN!"); continue; }
+                
+                me.balance -= amt;
+                receiver.balance += amt;
+                Transaction t = new Transaction(me.upiId, to, amt);
+                me.history.add(t);
+                receiver.history.add(t);
+                saveData();
+                System.out.println("Success! Rs." + amt + " sent to " + to);
+            } else if(ch.equals("3")) {
+                if(me.history.isEmpty()) System.out.println("No transactions");
+                else for(Transaction t : me.history) System.out.println(t);
+            } else if(ch.equals("4")) {
+                System.out.println("Available UPI IDs for demo:");
+                for(String id : users.keySet()) System.out.println("- " + id);
+            } else if(ch.equals("5")) { saveData(); break; }
+        }
+    }
+    
+    static void saveData() {
+        try(ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(FILE))) {
+            oos.writeObject(users);
+        } catch(Exception e) {}
+    }
+    static void loadData() {
+        try(ObjectInputStream ois = new ObjectInputStream(new FileInputStream(FILE))) {
+            users = (HashMap<String, UPIUser>) ois.readObject();
+        } catch(Exception e) {}
+    }
+              }
